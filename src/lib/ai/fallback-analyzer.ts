@@ -31,9 +31,35 @@ export function analyzeResumeFallback(
     }
   });
 
-  // Also extract title/role if possible
-  const titleMatch = jobDescription.match(/(?:title|role|position|hiring for|seeking a)\s*:?\s*([A-Za-z\s]{3,35})/i);
-  const detectedRole = options?.targetRole || (titleMatch ? titleMatch[1].trim() : "Software Engineer");
+  // Intelligent title/role detection
+  let detectedRole = options?.targetRole?.trim();
+  if (!detectedRole) {
+    const jdLines = jobDescription.split("\n").map((l) => l.trim()).filter(Boolean);
+    // Check first 3 lines for standard job title patterns
+    const titleRegex = /(?:Senior|Lead|Staff|Principal|Junior|Associate)?\s*(?:Full-Stack|Frontend|Backend|Software|Cloud|DevOps|Systems|Data|AI|Machine Learning|Product)?\s*(?:Engineer|Developer|Architect|Manager|Specialist|Analyst)/i;
+    
+    for (let i = 0; i < Math.min(jdLines.length, 4); i++) {
+      const line = jdLines[i];
+      if (titleRegex.test(line) && line.length <= 60 && !line.toLowerCase().startsWith("we are") && !line.toLowerCase().startsWith("about")) {
+        detectedRole = line.replace(/^(?:Job\s*Title|Position|Role)\s*:\s*/i, "").trim();
+        break;
+      }
+    }
+
+    if (!detectedRole) {
+      const seekingMatch = jobDescription.match(/(?:seeking|hiring|looking for)\s+(?:a|an)\s+([A-Za-z0-9\s\-/]+?)(?:\s+to|\s+who|\.|\n|,|\s+with)/i);
+      if (seekingMatch && seekingMatch[1].trim().length < 50) {
+        detectedRole = seekingMatch[1].trim();
+      } else {
+        const labeledMatch = jobDescription.match(/(?:Job\s*Title|Position|Role)\s*:\s*([^\n\r]+)/i);
+        if (labeledMatch) {
+          detectedRole = labeledMatch[1].trim();
+        } else {
+          detectedRole = "Software Engineer";
+        }
+      }
+    }
+  }
 
   const presentKeywords: string[] = [];
   const weakKeywords: string[] = [];
